@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1, maximum-scale=10, user-scalable=yes">
+    <title>图片解混淆</title>
+</head>
+<body>
+    <style>
+        body {
+            text-align: center;
+            color: #ffffff; 
+            background: #180d23; 
+        }
+        h1 {
+            background: linear-gradient(to right, #ff6699, #cc99ff); /* 渐变色 */
+            -webkit-background-clip: text; /* 使用文字作为渐变色的裁剪区域（适用于WebKit浏览器） */
+            color: transparent; /* 让文字颜色变为透明，以显示渐变色 */
+            display: inline-block; /* 使渐变色应用到文字上 */
+        }
+        img {
+          width: 500px;
+          height: auto; 
+        }
+    </style>
+    <h1>图片解混淆</h1>
+    <div id="info" style="padding:0.5rem 0;display:none;color:#666">请稍等</div>
+    <div id="imagebox" style="padding:0 1rem"></div>
+    <script>
+      function logistic(x, n) {
+        let l = [x];
+        n--;
+        while (n-- > 0) {
+          l.push(x = 3.9999999 * x * (1 - x));
+        }
+        return l;
+      }
+
+      function logisticmap(l) {
+        return l.map((x, a) => [x, a]).sort(logisticmapsort).map(x => x[1]);
+      }
+
+      function logisticmapsort(a, b) {
+        return a[0] - b[0];
+      }
+
+      function dePE2(arr1, arr2, w, h, k) {
+        let arr3 = new Uint8Array(4 * w * h);
+        let k1 = k;
+        for (let i = 0; i < w; i++) {
+          let list1 = logistic(k1, h);
+          let list = logisticmap(list1);
+          k1 = list1[list1.length - 1];
+          for (let j = 0; j < h; j++) {
+            let j2 = list[j];
+            arr3[(i + j2 * w) * 4] = arr1[(i + j * w) * 4];
+            arr3[(i + j2 * w) * 4 + 1] = arr1[(i + j * w) * 4 + 1];
+            arr3[(i + j2 * w) * 4 + 2] = arr1[(i + j * w) * 4 + 2];
+            arr3[(i + j2 * w) * 4 + 3] = arr1[(i + j * w) * 4 + 3];
+          }
+        }
+        k1 = k;
+        for (let j = 0; j < h; j++) {
+          let list1 = logistic(k1, w);
+          let list = logisticmap(list1);
+          k1 = list1[list1.length - 1];
+          for (let i = 0; i < w; i++) {
+            let i2 = list[i];
+            arr2[(i2 + j * w) * 4] = arr3[(i + j * w) * 4];
+            arr2[(i2 + j * w) * 4 + 1] = arr3[(i + j * w) * 4 + 1];
+            arr2[(i2 + j * w) * 4 + 2] = arr3[(i + j * w) * 4 + 2];
+            arr2[(i2 + j * w) * 4 + 3] = arr3[(i + j * w) * 4 + 3];
+          }
+        }
+      }
+
+      let info = document.getElementById("info");
+      let imagebox = document.getElementById("imagebox");
+
+      function appendimage(src, text) {
+        imagebox.appendChild(createimgbox(src, text));
+      }
+
+      function createimgbox(src, text) {
+        let div1 = document.createElement("div");
+        div1.style.padding = "1rem 0";
+        if (text != "") {
+          let div2 = document.createElement("div");
+          div2.style.padding = "0.5rem 0";
+          let span = document.createElement("span");
+          span.style.color = "#666";
+          span.innerText = text + "  ";
+          div2.appendChild(span);
+          let button = document.createElement("button");
+          button.innerText = "保存图片";
+          button.addEventListener("click", function () {
+            let a = document.createElement("a");
+            a.href = src;
+            a.download = Math.random().toString(16).slice(2) + ".png";
+            a.click();
+          });
+          div2.appendChild(button);
+          div1.appendChild(div2);
+        }
+        let img = document.createElement("img");
+        img.style.maxWidth = "100%";
+        img.src = src;
+        div1.appendChild(img);
+        return div1;
+      }
+
+      async function encdec() {
+        let key = parseFloat(0.666);
+        let imageUrls = [
+          'https://sc.gcu.edu.cn/microblog/filesvr/53e5bf8bb95bfc79c8a03ab8.jpg',
+          'https://sc.gcu.edu.cn/microblog/filesvr/53e5bf8bb95bfc79c8a03ab8.jpg',
+          'https://sc.gcu.edu.cn/microblog/filesvr/53e5bf8bb95bfc79c8a03ab8.jpg'
+        ];
+        
+        for (let i = 0; i < imageUrls.length; i++) {
+          let img = new Image();
+          img.crossOrigin = "Anonymous"; // 设置跨域属性
+          img.src = imageUrls[i];
+          await new Promise(resolve => {
+            img.onload = () => resolve();
+          });
+          
+          let cvs = document.createElement("canvas");
+          let ctx = cvs.getContext("2d");
+          cvs.width = img.width;
+          cvs.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          let imgdata1 = ctx.getImageData(0, 0, img.width, img.height);
+          let imgdata2 = ctx.createImageData(img.width, img.height);
+          dePE2(imgdata1.data, imgdata2.data, img.width, img.height, key);
+          ctx.putImageData(imgdata2, 0, 0);
+          cvs.toBlob(b => {
+            let src = URL.createObjectURL(b);
+            let text = "分辨率：" + img.width + "×" + img.height;
+            appendimage(src, text);
+          }, "image/jpeg"); // 修改为 jpeg 格式
+        }
+        info.style.display = "none";
+      }
+
+      window.onload = () => {
+        encdec();
+      };
+    </script>
+</body>
+</html>
+
